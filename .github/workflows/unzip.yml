@@ -1,0 +1,17 @@
+name: unzip fix
+on: workflow_dispatch
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          unzip -o value-agent-cloud-FIXED.zip
+          rm value-agent-cloud-FIXED.zip
+          git config user.name "fix-bot"
+          git config user.email "bot@github.com"
+          git add .
+          git commit -m "fix folders" || true
+          git push
