@@ -8,10 +8,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
-          unzip -o value-agent-cloud-FIXED.zip
-          rm value-agent-cloud-FIXED.zip
+          ls -la
+          python3 - << 'PY'
+          import zipfile, pathlib, os
+          zips = list(pathlib.Path('.').glob('*.zip'))
+          print("Found:", zips)
+          for zp in zips:
+              print(f"Extracting {zp}")
+              with zipfile.ZipFile(zp) as z:
+                  z.extractall('.')
+          PY
+          rm -f *.zip
           git config user.name "fix-bot"
           git config user.email "bot@github.com"
-          git add .
-          git commit -m "fix folders" || true
+          git add -A
+          git commit -m "fix folders" || echo "no changes"
           git push
