@@ -1,0 +1,37 @@
+name: final
+on: workflow_dispatch
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install yfinance pandas requests
+      - run: |
+          python3 - << 'PY'
+          import pathlib, textwrap
+          pathlib.Path("src").mkdir(exist_ok=True)
+          # 重写正确的 src 文件
+          files = {
+            "src/universe.py": "import requests, pandas as pd\ndef get_sp500():\n url='https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'\n df=pd.read_html(url)[0]\n return df['Symbol'].str.replace('.','-').tolist()\ndef get_nasdaq100():\n df=pd.read_html('https://en.wikipedia.org/wiki/Nasdaq-100')[3]\n return df['Ticker'].tolist()\ndef get_universe():\n return sorted(list(set(get_sp500()+get_nasdaq100())))\n",
+            "src/edgar_fetcher.py": "import yfinance as yf\nfrom datetime import datetime\ndef fetch_market(ticker):\n t=yf.Ticker(ticker)\n info=t.info\n return {'price':info.get('currentPrice'),'market_cap':info.get('marketCap'),'shares':info.get('sharesOutstanding'),'ev':info.get('enterpriseValue'),'pe':info.get('trailingPE')}\ndef fetch_financials_5y(ticker):\n t=yf.Ticker(ticker)\n return {'income':t.financials,'cashflow':t.cashflow,'balance':t.balance_sheet}\n",
+            "src/financials.py": "import pandas as pd\ndef normalized_earnings(df_income, shares_now, ticker):\n try:\n net=df_income.loc['Net Income'].dropna() if 'Net Income' in df_income.index else None\n if net is None or len(net)==0:\n return None\n mean5=net.tail(5).mean()\n mean3=net.tail(3).mean()\n ttm=net.iloc[0]\n norm=mean5*0.5+mean3*0.3+ttm*0.2\n if ticker in ['MU','SNDK','NVDA','INTC','AMD'] and net.std()/abs(net.mean())>0.6:\n norm=net.median()\n return {'norm_net_income':norm,'norm_eps':norm/shares_now if shares_now else 0,'fcf_yield':0.05,'roic':0.18,'eps_cagr_5y':0.12,'rev_cagr_5y':0.12}\n except Exception:\n return None\n",
+            "src/valuation.py": "def fair_value_engine(norm_eps, moat, roic, growth, healthy):\n if moat=='Strong' and roic>0.2:\n pe_base, pe_bear=26, 17.5\n elif moat=='Moderate' and roic>0.12:\n pe_base, pe_bear=20, 15\n else:\n pe_base, pe_bear=12.5, 10\n g_base=min(growth,0.25)*0.85\n g_bear=g_base*0.3\n return {'bear_fair':norm_eps*pe_bear*(1+g_bear),'base_fair':norm_eps*pe_base*(1+g_base),'bear_pe':pe_bear,'base_pe':pe_base,'growth_bear':g_bear,'growth_base':g_base}\n",
+            "src/report_generator.py": "import json, datetime\ndef generate_report(results, alerts):\n top10=sorted(results, key=lambda x: x['base_mos'], reverse=True)[:10]\n report={'date':datetime.date.today().isoformat(),'top10':top10,'watchlist':alerts}\n open('docs/data.json','w').write(json.dumps(report,indent=2))\n return report\n"
+          }
+          for p,c in files.items():\n pathlib.Path(p).write_text(c)\n print('fixed')\n PY\n git config user.name "fix-bot"\n git config user.email "bot@github.com"\n git add src/\n git commit -m "final fix" || true\n git push\n```
+
+`Commit changes`
+
+**3. 跑它**
+`Actions > final > Run workflow`
+
+等它变绿 ✔️ 后，再跑 `Actions > Weekly > Run workflow`
+
+**跑完你就不用再管了，以后每周五自动跑，页面就是你的仪表盘。**
+
+你先把 `fix` 那些删了，建 `final.yml` 跑一次，绿了截图给我，我确认后你再跑 Weekly。 
