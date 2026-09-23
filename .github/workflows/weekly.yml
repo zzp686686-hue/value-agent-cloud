@@ -1,0 +1,22 @@
+name: Weekly
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 23 * * 5'
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python main.py
+      - run: |
+          git config user.name "value-bot"
+          git config user.email "bot@github.com"
+          git add docs/
+          git diff --quiet && git diff --staged --quiet || (git commit -m "weekly" && git push)
